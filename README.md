@@ -20,61 +20,47 @@ Created a central Amazon S3 bucket to serve as the foundation for the entire dat
 
 ### Approach
 To ensure secure, permission-based interaction between AWS services, created three separate IAM roles:
-1.  **Lambda Execution Role (`Lambda-S3-Processing-Role`)**: The role was attached to the Lambda function. It grants permissions for Lambda to read objects from the `raw/` S3 folder, write new objects to the `processed/` S3 folder, and write logs to CloudWatch. `AWSLambdaBasicExecutionRole` and `AmazonS3FullAccess` are the policies granted for this role.
-2.  **Glue Service Role (`Glue-S3-Crawler-Role`)**: This role was used by the AWS Glue Crawler. It provides permissions to access the `processed/` data in S3 and the `AWSGlueServiceRole` policy to manage the Glue Data Catalog (creating databases and tables).
-3.  **EC2 Instance Profile (`EC2-Athena-Dashboard-Role`)**: This role was attached to the EC2 instance. It grants the instance permissions to run queries with `AmazonAthenaFullAccess` and to read/write query results from S3 using `AmazonS3FullAccess`.
+1.  **Lambda Execution Role (`Lambda-S3-Processing-Role`)**: The role is attached to the Lambda function. It grants permissions for Lambda to read objects from the `raw/` S3 folder, write new objects to the `processed/` S3 folder, and write logs to CloudWatch. `AWSLambdaBasicExecutionRole` and `AmazonS3FullAccess` are the policies granted for this role.
+2.  **Glue Service Role (`Glue-S3-Crawler-Role`)**: This role is used by the AWS Glue Crawler. It provides permissions to access the `processed/` data in S3. `AWSGlueServiceRole`, `AWSGlueConsoleFullAccess` and `AmazonS3FullAccess` are the policies granted to manage the creation of databases and tables.
+3.  **EC2 Instance Profile (`EC2-Athena-Dashboard-Role`)**: The role is attached to the EC2 instance. It grants the instance permissions to run queries with `AmazonAthenaFullAccess` and to read/write query results from S3 using `AmazonS3FullAccess`.
 
-### Screenshot: IAM Roles
-
-
+### Screenshot:
+<img width="780" height="620" alt="IamRolesCreated" src="https://github.com/user-attachments/assets/8c1a970d-7c0b-403d-bfb7-d3c1d80d2b88" />
 
 ---
-
 ## 3. AWS Lambda Function ⚙️
 
 ### Approach
+Created a serverless compute function using AWS Lambda to automate the data cleaning process. The function, named `FilterAndProcessOrders`, uses the Python 3.13 runtime. It is configured to use the existing `Lambda-S3-Processing-Role` created in the previous step. The function's code is designed to be triggered by an S3 event, read the uploaded CSV file, perform data filtering and transformations, and then save the cleaned data back to the `processed/` S3 folder.
 
-I created a serverless compute function using AWS Lambda to automate the data cleaning process. The function, named `FilterAndProcessOrders`, uses the Python 3.9 runtime. It is configured to use the existing `Lambda-S3-Processing-Role` created in the previous step. The function's code is designed to be triggered by an S3 event, read the uploaded CSV file, perform data filtering and transformations, and then save the cleaned data back to the `processed/` S3 folder.
-
-### Screenshot: Lambda Function
-
-
+### Screenshot:
+<img width="780" height="620" alt="LambdaFunction" src="https://github.com/user-attachments/assets/1590b2a9-f537-4fcc-95e7-59992f02bb0e" />
 
 ---
-
 ## 4. S3 Trigger Configuration ⚡
 
 ### Approach
+To make the pipeline event-driven, added an S3 trigger to the `FilterAndProcessOrders` Lambda function. This trigger is configured to monitor the S3 bucket for **All object create events**. To ensure the function only runs on relevant files, specified a **prefix** of `raw/` and a **suffix** of `.csv`. This configuration automatically invokes the Lambda function *only* when a new CSV file is uploaded to the `raw/` folder.
 
-To make the pipeline event-driven, I added an S3 trigger to the `FilterAndProcessOrders` Lambda function. This trigger is configured to monitor the S3 bucket for **All object create events**. To ensure the function only runs on relevant files, I specified a **prefix** of `raw/` and a **suffix** of `.csv`. This configuration automatically invokes the Lambda function *only* when a new CSV file is uploaded to the `raw/` folder.
-
-### Screenshot: Configured Trigger
-
-
+### Screenshot:
+<img width="780" height="620" alt="S3TriggerInLambdaFunction" src="https://github.com/user-attachments/assets/6f0133ac-62df-4ef4-9fec-cc822923b135" />
 
 ---
-
 ## 5. Processed Data in S3
 
 ### Approach
-
-After configuring the Lambda function and its S3 trigger, I tested the pipeline by uploading the `Orders.csv` file to the `raw/` folder of the S3 bucket. This action successfully triggered the Lambda function, which executed its processing logic. As a result, a new, cleaned CSV file appeared in the `processed/` folder, confirming the automated workflow was successful.
-
-### Screenshot: Processed CSV File in S3
-
-
+After configuring the Lambda function and its S3 trigger, tested the pipeline by uploading the `Orders.csv` file to the `raw/` folder of the S3 bucket. The action successfully triggered the Lambda function, which executed its processing logic. As a result, a new, cleaned CSV file appeared in the `processed/` folder, confirming the automated workflow was successful.
+### Screenshot: 
+<img width="780" height="620" alt="S3BucketProcessedFolder" src="https://github.com/user-attachments/assets/9a00871b-2d8b-4d96-9a9b-1a99e018e1cb" />
 
 ---
-
 ## 6. AWS Glue Crawler 🕸️
 
 ### Approach
+To make the processed data queryable by Athena, used the AWS Glue to create a data catalog. Created a new crawler named `orders_processed_crawler` and pointed it to the `processed/` S3 folder. Assigned the `Glue-S3-Crawler-Role` to it. The crawler was configured to output its findings to a new database named `orders_db`. Upon running the crawler, it successfully scanned the processed CSV, inferred its schema, and created a new table within the `orders_db` database.
 
-To make the processed data queryable by Athena, I used AWS Glue to create a data catalog. I created a new crawler named `orders_processed_crawler` and pointed it to the `processed/` S3 folder. I assigned the `Glue-S3-Crawler-Role` to it. The crawler was configured to output its findings to a new database named `orders_db`. Upon running the crawler, it successfully scanned the processed CSV, inferred its schema, and created a new table within the `orders_db` database.
-
-### Screenshot: Crawler CloudWatch (Run Details)
-
-
+### Screenshot:
+<img width="780" height="620" alt="CloudWatchLogs" src="https://github.com/user-attachments/assets/78607b07-da9c-49df-97e1-c486186cb705" />
 
 ---
 
